@@ -341,9 +341,11 @@
     </div>
   </div>
   <!-- hello -->
-  <script src="https://screensharing-nn04.onrender.com/socket.io/socket.io.js"></script>
+   <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <!-- <script src="https://screensharing-nn04.onrender.com/socket.io/socket.io.js"></script> -->
   <script>
-    const socket = io();
+      const socket = io("https://screensharing-nn04.onrender.com"); 
+
 
     const statusEl = document.getElementById('status');
     const startBtn = document.getElementById('startBtn');
