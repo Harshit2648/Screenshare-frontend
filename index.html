@@ -5,17 +5,89 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ShareScreen — Meet Style</title>
- <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io("https://screen-sharing-1cu4.onrender.com/");
+    const socket = io({
+      transports: ['websocket', 'polling'],
+      upgrade: true,
+      rememberUpgrade: true
+    });
   </script>
 
   <style>
+    
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
+
+
+    .user-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #111827; /* dark navy */
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin: 8px 0;
+  color: #e5e7eb;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  transition: background 0.2s ease;
+}
+
+.user-item:hover {
+  background: #1f2937;
+}
+
+.user-avatar {
+  background: linear-gradient(135deg, #6366f1, #3b82f6);
+  color: white;
+  font-weight: bold;
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  margin-right: 12px;
+}
+
+.user-info {
+  flex-grow: 1;
+}
+
+.user-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #f9fafb;
+}
+
+.user-status {
+  font-size: 13px;
+  color: #10b981; /* green for online */
+}
+
+.request-btn {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.request-btn:hover {
+  background: #2563eb;
+  transform: scale(1.05);
+}
+
+.request-btn:active {
+  transform: scale(0.97);
+}
 
     :root {
       --bg1: #0f172a;
@@ -60,6 +132,28 @@
       top: 0;
       z-index: 5;
     }
+.request-btn {
+  background: #3b82f6;   /* blue */
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.request-btn:hover {
+  background: #2563eb;   /* darker blue */
+  transform: scale(1.05);
+  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+}
+
+.request-btn:active {
+  transform: scale(0.96);
+  background: #1d4ed8;   /* even darker when clicked */
+}
 
     .brand {
       display: flex;
@@ -373,14 +467,10 @@
         <span class="badge" id="roomBadge">No room</span>
       </div>
       <div class="meet-info" id="statusMessage">Not connected</div>
-      
       <div class="top-actions">
         <button class="btn" id="openSettingsBtn">Details</button>
-        <button class="btn primary" id="requestBtn">Request screen</button>
+        <button  style="display:none;"class="btn primary" id="requestBtn">Request screen</button>
         <button class="btn danger" id="stopBtn" style="display:none;">Stop</button>
-      </div>
-      <div class="group">
-        <button style="display: none;" class="btn  danger" id="leaveFake" title="Leave (UI only)">Leave</button>
       </div>
     </div>
 
@@ -405,15 +495,17 @@
 
     <!-- Bottom Controls -->
     <div class="controls">
-      <div id="room-name" class="group">
+      <div class="group">
         <input id="roomId" placeholder="Room ID" class="btn" style="width:150px;">
         <input id="userName" placeholder="Your name" class="btn" style="width:160px;">
-       
-          <button class="btn icon" id="joinBtn" title="Join Room">➕</button>
-
+      </div>
+      <div class="group">
+        <button class="btn icon" id="joinBtn" title="Join Room">➕</button>
       </div>
 
-    
+      <div class="group">
+        <button class="btn danger" id="leaveFake" title="Leave (UI only)">Leave</button>
+      </div>
     </div>
 
     <!-- Right: People -->
@@ -501,6 +593,20 @@
 
     function showPopup() { elements.popup.style.display = "block"; elements.popupBackdrop.style.display = "block"; }
     function hidePopup() { elements.popup.style.display = "none"; elements.popupBackdrop.style.display = "none"; }
+    function requestScreen(targetId) {
+      if (!roomId) {
+        alert("Join a room first!");
+        return;
+      }
+      if (isSharingActive) {
+        alert("Someone is already sharing. Please wait.");
+        return;
+      }
+
+      socket.emit("request-screen", { roomId, targetId });
+      updateStatus("Requesting screen share...", 'connecting');
+      debugLog("Requesting screen share");
+    }
 
     function setConnState(type) {
       elements.connDot.style.background = type === 'connected' ? "#22c55e" :
@@ -526,18 +632,37 @@
         const initials = user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
         const statusClass = user.isSharing ? 'status-sharing' : 'status-online';
         const statusText = user.isSharing ? 'Sharing screen' : 'Online';
-        html += `
-          <div class="user-item">
-            <div class="user-avatar">${initials}</div>
-            <div class="user-info">
-              <div class="user-name">${user.name || 'Anonymous'}</div>
-              <div class="user-status">${statusText}</div>
-            </div>
-            <div class="status-indicator ${statusClass}"></div>
-          </div>`;
+     html += `
+  <div class="user-item flex items-center justify-between p-3 bg-white shadow rounded-xl mb-3">
+    <!-- Avatar -->
+    <div class="flex items-center gap-3">
+      <div class="user-avatar w-10 h-10 flex items-center justify-center rounded-full bg-blue-500 text-white font-semibold">
+        ${initials}
+      </div>
+      <div class="user-info">
+        <div class="user-name font-medium text-gray-800">${user.name || 'Anonymous'}</div>
+        <div class="user-status text-sm text-gray-500 flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full ${statusClass}"></span>
+          ${statusText}
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center gap-2">
+      <button 
+        onclick="requestScreen('${user.id}')"
+        class="px-3 btn primary py-1.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition">
+        Request Screen
+      </button>
+    </div>
+  </div>
+`;
+
       });
       list.innerHTML = html;
     }
+
 
     function showVideoPlaceholder() {
       document.getElementById('ph').style.display = 'grid';
@@ -557,22 +682,13 @@
       updateStatus("Connecting to room...", 'connecting');
       updateRoomBadge();
       debugLog(`Joining room: ${roomId} as ${userName}`);
-
-      const roomName = document.getElementById("room-name");
-
-      // hide
-      roomName.style.display = "none";
-      const leaveFake = document.getElementById("leaveFake");
-
-      // hide
-      leaveFake.style.display = "block";
     };
 
     // Request screen
-    elements.requestBtn.onclick = () => {
+    elements.requestBtn.onclick = (targetId) => {
       if (!roomId) { alert("Join a room first!"); return; }
       if (isSharingActive) { alert("Someone is already sharing. Please wait."); return; }
-      socket.emit("request-screen", roomId);
+      socket.emit("request-screen", { roomId, targetId });
       updateStatus("Requesting screen share...", 'connecting');
       debugLog("Requesting screen share");
     };
