@@ -5,13 +5,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ShareScreen — Meet Style</title>
-  <script src="/socket.io/socket.io.js"></script>
+ <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
   <script>
-    const socket = io({
-      transports: ['websocket', 'polling'],
-      upgrade: true,
-      rememberUpgrade: true
-    });
+       const socket = io("https://screen-sharing-1cu4.onrender.com/");
   </script>
 
   <style>
